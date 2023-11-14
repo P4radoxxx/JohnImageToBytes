@@ -1,0 +1,96 @@
+﻿@page "/Upload"
+@using JohnBytesToDatabase.Data
+@inject DatabaseService DBService
+
+<PageTitle>Uploadez vos images et convertissez-les en bytes dans la DB!</PageTitle>
+
+<form @onsubmit="SubmitHandler">
+    <div>
+        <label for="image">Choisissez une image à uploader...</label>
+        <InputFile id="image" accept=".jpg, .jpeg, .png" OnChange="HandleFileSelected"></InputFile>
+    </div>
+
+    <button type="submit">Upload</button>
+</form>
+
+@if (isFileSelected)
+{
+    <h3>Image Prête à l'envoie...</h3>
+}
+
+<button @onclick="RetrieveAndDisplayImage">Afficher l'image depuis la base de données</button>
+
+@if (ImageBytes != null)
+{
+    <h3>Image depuis la base de données</h3>
+    <img src="@GetImageSource()" alt="Image depuis la base de données" />
+}
+
+@code
+{
+    private bool isFileSelected;
+    private byte[] ImageBytes;
+
+    // Transforme l'image en un tableau d'octets
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        isFileSelected = true;
+        var imgFile = e.GetMultipleFiles().FirstOrDefault();
+
+        if (imgFile != null)
+        {
+            using (var memStream = new MemoryStream())
+            {
+                await imgFile.OpenReadStream().CopyToAsync(memStream);
+                ImageBytes = memStream.ToArray();
+            }
+        }
+        else
+        {
+            Console.WriteLine("Erreur, rien à transformer !");
+        }
+    }
+
+    private async Task SubmitHandler()
+    {
+        UploadToDB(ImageBytes);
+
+        // Reset
+        isFileSelected = false;
+        ImageBytes = null;
+    }
+
+    private void UploadToDB(byte[] imageData)
+    {
+        // Upload les bytes vers une colonne VARBINARY
+        DBService.UploadImage(imageData);
+    }
+
+
+    // Fetch les bytes de l'image depuis la DB
+    private byte[] GetImageBytes()
+    {
+        return DBService.GetImage();
+    }
+
+
+    // Convertis les bytes en base64 et affiche l'image dans la balise
+    private string GetImageSource()
+    {
+        byte[] imageBytes = GetImageBytes();
+
+        if (imageBytes != null)
+        {
+            string base64Image = Convert.ToBase64String(imageBytes);
+            return $"data:image/jpeg;base64,{base64Image}";
+        }
+
+        return string.Empty;
+    }
+
+    private void RetrieveAndDisplayImage()
+    {
+        
+        ImageBytes = GetImageBytes();
+    }
+}
